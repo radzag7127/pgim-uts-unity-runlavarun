@@ -36728,6 +36728,10 @@ PrefabInstance:
       propertyPath: runSpeed
       value: 10
       objectReference: {fileID: 0}
+    - target: {fileID: 309444578475761340, guid: 3eff01be34432804b91dda6f21c15ca4, type: 3}
+      propertyPath: wallLayer.m_Bits
+      value: 64
+      objectReference: {fileID: 0}
     - target: {fileID: 6894072972178132195, guid: 3eff01be34432804b91dda6f21c15ca4, type: 3}
       propertyPath: m_Name
       value: Player

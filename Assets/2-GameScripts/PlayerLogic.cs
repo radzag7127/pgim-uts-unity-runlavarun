@@ -12,7 +12,12 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] Vector2 deathKick = new Vector2(10f, 10f);
     [SerializeField] GameObject bullet;
     [SerializeField] Transform gun;
+    [SerializeField] float wallSlideSpeed = 2f;
+    [SerializeField] float wallCheckDistance = 0.5f;
+    [SerializeField] Vector2 wallJumpForce = new Vector2(15f, 15f);
+    [SerializeField] LayerMask wallLayer;
 
+    bool isWallSliding;
     Vector2 moveInput;
     Rigidbody2D myRigidbody;
     Animator myAnimator;
@@ -36,6 +41,7 @@ public class PlayerMovement : MonoBehaviour
         Run();
         FlipSprite();
         ClimbLadder();
+        WallSlide();
         Die();
     }
 
@@ -45,6 +51,7 @@ public class PlayerMovement : MonoBehaviour
         Instantiate(bullet, gun.position, transform.rotation);
     }
 
+    //TO DO : Acceleration System
     void OnMove(InputValue value)
     {
         if (!isAlive) { return; }
@@ -54,14 +61,19 @@ public class PlayerMovement : MonoBehaviour
     void OnJump(InputValue value)
     {
         if (!isAlive) { return; }
-        if (!myFeetCollider.IsTouchingLayers(LayerMask.GetMask("Ground"))) { return; }
-
         if (value.isPressed)
         {
-            myRigidbody.velocity += new Vector2(0f, jumpSpeed);
+            if (myFeetCollider.IsTouchingLayers(LayerMask.GetMask("Ground")))
+            {
+                myRigidbody.velocity += new Vector2(0f, jumpSpeed);
+            }
+            else if (isWallSliding)
+            {
+                myRigidbody.velocity = new Vector2(-Mathf.Sign(transform.localScale.x) * wallJumpForce.x, wallJumpForce.y);
+                transform.localScale = new Vector2(-transform.localScale.x, transform.localScale.y);
+                isWallSliding = false;
+            }
         }
-
-
     }
 
     void Run()
@@ -79,10 +91,13 @@ public class PlayerMovement : MonoBehaviour
 
         if (playerHasHorizontalSpeed)
         {
-            transform.localScale = new Vector2(Mathf.Sign(myRigidbody.velocity.x), 1f);
+            if (!isWallSliding)
+            {
+                transform.localScale = new Vector2(Mathf.Sign(myRigidbody.velocity.x), 1f);
+            }
         }
-
     }
+
 
     void ClimbLadder()
     {
@@ -106,6 +121,7 @@ public class PlayerMovement : MonoBehaviour
     {
         if (myBodyCollider.IsTouchingLayers(LayerMask.GetMask("Enemies", "Hazards")))
         {
+            Debug.Log("Player has touched a hazard!");
             isAlive = false;
             myAnimator.SetTrigger("Dying");
             myRigidbody.velocity = deathKick;
@@ -113,4 +129,27 @@ public class PlayerMovement : MonoBehaviour
 
         }
     }
+
+    void WallSlide()
+    {
+        if (IsWallSliding())
+        {
+            myRigidbody.velocity = new Vector2(myRigidbody.velocity.x, -wallSlideSpeed);
+            isWallSliding = true;
+        }
+        else
+        {
+            isWallSliding = false;
+        }
+        myAnimator.SetBool("isWallSliding", isWallSliding);
+    }
+
+    bool IsWallSliding()
+    {
+        bool touchingWall = Physics2D.Raycast(transform.position, Vector2.right * transform.localScale.x, wallCheckDistance, wallLayer);
+        bool notGrounded = !myFeetCollider.IsTouchingLayers(LayerMask.GetMask("Ground"));
+        bool movingDown = myRigidbody.velocity.y < 0;
+        return touchingWall && notGrounded && movingDown;
+    }
+
 }
