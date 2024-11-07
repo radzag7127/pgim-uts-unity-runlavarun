@@ -2,8 +2,8 @@ using UnityEngine;
 
 public class RisingLava : MonoBehaviour
 {
-    [SerializeField] private float riseSpeed = 1f;
-    [SerializeField] private float maxHeight = 10f;
+    [SerializeField] private float riseSpeed = 3f;
+    [SerializeField] private float maxHeight = 100000f;
     [SerializeField] private LayerMask playerLayer;
 
     private float currentHeight;

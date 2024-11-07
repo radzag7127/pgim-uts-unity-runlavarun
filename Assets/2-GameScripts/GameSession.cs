@@ -6,72 +6,108 @@ using UnityEngine.SceneManagement;
 
 public class GameSession : MonoBehaviour
 {
-
     [SerializeField] int playerLives = 3;
     [SerializeField] int score = 0;
 
-    string intro = "MOVE: W-A-S-D\nJUMP: SPACE\nATTACK: MOUSE 1";
+    float intro = 0f; // Stopwatch starting value
+    bool isGameActive = true; // Flag to check if the game is active
 
     [SerializeField] TextMeshProUGUI livesText;
     [SerializeField] TextMeshProUGUI scoreText;
     [SerializeField] TextMeshProUGUI introText;
+    [SerializeField] float endSequenceDelay = 4f; // Delay before returning to menu
 
     void Awake()
     {
         int numScenePersists = FindObjectsOfType<GameSession>().Length;
-        if (numScenePersists > 1 ) {
+        if (numScenePersists > 1)
+        {
             Destroy(gameObject);
         }
-        else {
+        else
+        {
             DontDestroyOnLoad(gameObject);
         }
     }
 
-    void Start() {
+    void Start()
+    {
         livesText.text = playerLives.ToString();
         scoreText.text = score.ToString();
-        introText.text = intro.ToString();
+        introText.text = "Time: " + intro.ToString("F2"); // Initial display of stopwatch
     }
 
-    public void ProcessPlayerDeath() {
-        if (playerLives > 1) {
+    void Update()
+    {
+        // Stopwatch logic
+        if (isGameActive)
+        {
+            intro += Time.deltaTime; // Increment the timer
+            introText.text = "Time: " + intro.ToString("F2"); // Display the time with two decimal places
+        }
+    }
+
+    public void ProcessPlayerDeath()
+    {
+        if (playerLives > 1)
+        {
             TakeLife();
         }
-        else {
+        else
+        {
             ResetGameSession();
         }
     }
 
-    public void AddToScore(int pointsToAdd) {
+    public void AddToScore(int pointsToAdd)
+    {
         score += pointsToAdd;
         scoreText.text = score.ToString();
     }
 
-    void ResetGameSession() {
+    void ResetGameSession()
+    {
         FindObjectOfType<ScenePersist>().ResetScenePersist();
         SceneManager.LoadScene(0);
         Destroy(gameObject);
     }
 
-    void TakeLife() {
+    void TakeLife()
+    {
         playerLives--;
         int currentSceneIndex = SceneManager.GetActiveScene().buildIndex;
         SceneManager.LoadScene(currentSceneIndex);
         livesText.text = playerLives.ToString();
     }
 
-    public void HideIntro() {
-        int currentSceneIndex = SceneManager.GetActiveScene().buildIndex;
-        
-        if (currentSceneIndex == 6) {
-            introText.text = "Congrats!\nYou're the best!";
-            livesText.text = "";
-            scoreText.text = "";
-        }
+    public void TriggerEndSequence()
+    {
+        StartCoroutine(ShowCongratulationsAndReturnToMenu());
+    }
 
-        else {
+    IEnumerator ShowCongratulationsAndReturnToMenu()
+    {
+        isGameActive = false; // Stop the stopwatch
+        introText.text = "Congrats!\nTime: " + intro.ToString("F2"); // Display the congratulations message with final time
+
+        yield return new WaitForSeconds(endSequenceDelay); // Wait for the congratulatory message to show
+
+        // Return to main menu (assuming main menu is scene 0)
+        SceneManager.LoadScene(0);
+        Destroy(gameObject); // Reset the GameSession
+    }
+
+    public void HideIntro()
+    {
+        int currentSceneIndex = SceneManager.GetActiveScene().buildIndex;
+
+        if (currentSceneIndex == 6)
+        {
+            TriggerEndSequence();
+        }
+        else
+        {
             introText.text = "";
         }
-        
     }
 }

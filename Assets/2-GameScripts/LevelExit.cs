@@ -9,12 +9,23 @@ public class LevelExit : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D collision)
     {
-
         if (collision.CompareTag("Player"))
         {
-            StartCoroutine(LoadNextLevel());
-        }
+            GameSession gameSession = FindObjectOfType<GameSession>();
+            int currentSceneIndex = SceneManager.GetActiveScene().buildIndex;
+            int nextSceneIndex = currentSceneIndex + 1;
 
+            if (nextSceneIndex == SceneManager.sceneCountInBuildSettings)
+            {
+                // Trigger end sequence if this is the last level
+                gameSession.TriggerEndSequence();
+            }
+            else
+            {
+                // Otherwise, load the next level
+                StartCoroutine(LoadNextLevel());
+            }
+        }
     }
 
     IEnumerator LoadNextLevel()
@@ -23,15 +34,8 @@ public class LevelExit : MonoBehaviour
         int currentSceneIndex = SceneManager.GetActiveScene().buildIndex;
         int nextSceneIndex = currentSceneIndex + 1;
 
-        if (nextSceneIndex == SceneManager.sceneCountInBuildSettings)
-        {
-            nextSceneIndex = 0;
-        }
         FindObjectOfType<GameSession>().HideIntro();
         FindObjectOfType<ScenePersist>().ResetScenePersist();
         SceneManager.LoadScene(nextSceneIndex);
     }
-
-
-
 }

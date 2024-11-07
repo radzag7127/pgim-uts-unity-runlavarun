@@ -6,16 +6,17 @@ using UnityEngine.InputSystem;
 
 public class PlayerMovement : MonoBehaviour
 {
-    [SerializeField] float runSpeed = 10f;
-    [SerializeField] float jumpSpeed = 15f;
-    [SerializeField] float climbSpeed = 10f;
+    [SerializeField] float runSpeed = 9f;
+    [SerializeField] float jumpSpeed = 14f;
+    [SerializeField] float climbSpeed = 9f;
     [SerializeField] Vector2 deathKick = new Vector2(10f, 10f);
     [SerializeField] GameObject bullet;
     [SerializeField] Transform gun;
     [SerializeField] float wallSlideSpeed = 2f;
     [SerializeField] float wallCheckDistance = 0.5f;
-    [SerializeField] Vector2 wallJumpForce = new Vector2(15f, 15f);
+    [SerializeField] Vector2 wallJumpForce = new Vector2(6f, 14f);
     [SerializeField] LayerMask wallLayer;
+    [SerializeField] float wallJumpCooldown = 0.2f;
 
     bool isWallSliding;
     Vector2 moveInput;
@@ -25,6 +26,13 @@ public class PlayerMovement : MonoBehaviour
     BoxCollider2D myFeetCollider;
     float gravityScaleAtStart;
     bool isAlive = true;
+    bool hasWallJumped = false;
+    bool isWallJumping = false;
+    float wallJumpFlipDelay = 0.1f;
+    float wallJumpFlipTimer = 0f;
+    float wallJumpTimer = 0f;
+    int maxJumpCount = 2;
+    int jumpCount = 0;
 
     void Start()
     {
@@ -43,6 +51,31 @@ public class PlayerMovement : MonoBehaviour
         ClimbLadder();
         WallSlide();
         Die();
+
+        if (hasWallJumped)
+        {
+            wallJumpFlipTimer -= Time.deltaTime;
+            if (wallJumpFlipTimer <= 0f)
+            {
+                hasWallJumped = false;
+            }
+        }
+
+        // Handle wall jump cooldown
+        if (isWallJumping)
+        {
+            wallJumpTimer -= Time.deltaTime;
+            if (wallJumpTimer <= 0f)
+            {
+                isWallJumping = false;
+            }
+        }
+
+        // Reset jump count when grounded
+        if (myFeetCollider.IsTouchingLayers(LayerMask.GetMask("Ground")))
+        {
+            jumpCount = 0;
+        }
     }
 
     void OnFire(InputValue inputValue)
@@ -51,11 +84,18 @@ public class PlayerMovement : MonoBehaviour
         Instantiate(bullet, gun.position, transform.rotation);
     }
 
-    //TO DO : Acceleration System
     void OnMove(InputValue value)
     {
         if (!isAlive) { return; }
-        moveInput = value.Get<Vector2>();
+        Vector2 input = value.Get<Vector2>();
+
+        // Detect if the player changed direction
+        if (Mathf.Sign(input.x) != Mathf.Sign(moveInput.x) && input.x != 0)
+        {
+            hasWallJumped = false;
+        }
+
+        moveInput = input;
     }
 
     void OnJump(InputValue value)
@@ -65,43 +105,57 @@ public class PlayerMovement : MonoBehaviour
         {
             if (myFeetCollider.IsTouchingLayers(LayerMask.GetMask("Ground")))
             {
-                myRigidbody.velocity += new Vector2(0f, jumpSpeed);
+                myRigidbody.velocity = new Vector2(myRigidbody.velocity.x, jumpSpeed);
+                jumpCount = 1;
             }
             else if (isWallSliding)
             {
-                myRigidbody.velocity = new Vector2(-Mathf.Sign(transform.localScale.x) * wallJumpForce.x, wallJumpForce.y);
+                float horizontalForce = -Mathf.Sign(transform.localScale.x) * wallJumpForce.x; // Push away from wall
+                myRigidbody.velocity = new Vector2(horizontalForce, wallJumpForce.y);
                 transform.localScale = new Vector2(-transform.localScale.x, transform.localScale.y);
                 isWallSliding = false;
+                hasWallJumped = true;
+                wallJumpFlipTimer = wallJumpFlipDelay;
+                jumpCount = 1;
+
+                // Start wall jump cooldown
+                isWallJumping = true;
+                wallJumpTimer = wallJumpCooldown;
+            }
+            else if (jumpCount < maxJumpCount)
+            {
+                myRigidbody.velocity = new Vector2(myRigidbody.velocity.x, jumpSpeed);
+                jumpCount++;
             }
         }
     }
 
     void Run()
     {
-        Vector2 playerVelocity = new Vector2(moveInput.x * runSpeed, myRigidbody.velocity.y);
-        myRigidbody.velocity = playerVelocity;
+        // Only allow running if not in wall jump cooldown
+        if (!isWallJumping)
+        {
+            Vector2 playerVelocity = new Vector2(moveInput.x * runSpeed, myRigidbody.velocity.y);
+            myRigidbody.velocity = playerVelocity;
 
-        bool playerHasHorizontalSpeed = Mathf.Abs(myRigidbody.velocity.x) > Mathf.Epsilon;
-        myAnimator.SetBool("isRunning", playerHasHorizontalSpeed);
+            bool playerHasHorizontalSpeed = Mathf.Abs(myRigidbody.velocity.x) > Mathf.Epsilon;
+            myAnimator.SetBool("isRunning", playerHasHorizontalSpeed);
+        }
     }
 
     void FlipSprite()
     {
-        bool playerHasHorizontalSpeed = Mathf.Abs(myRigidbody.velocity.x) > Mathf.Epsilon;
+        if (hasWallJumped) { return; } // Prevent flipping during delay
 
+        bool playerHasHorizontalSpeed = Mathf.Abs(myRigidbody.velocity.x) > Mathf.Epsilon;
         if (playerHasHorizontalSpeed)
         {
-            if (!isWallSliding)
-            {
-                transform.localScale = new Vector2(Mathf.Sign(myRigidbody.velocity.x), 1f);
-            }
+            transform.localScale = new Vector2(Mathf.Sign(myRigidbody.velocity.x), 1f);
         }
     }
 
-
     void ClimbLadder()
     {
-
         if (!myFeetCollider.IsTouchingLayers(LayerMask.GetMask("Climbing")))
         {
             myRigidbody.gravityScale = gravityScaleAtStart;
@@ -126,7 +180,6 @@ public class PlayerMovement : MonoBehaviour
             myAnimator.SetTrigger("Dying");
             myRigidbody.velocity = deathKick;
             FindObjectOfType<GameSession>().ProcessPlayerDeath();
-
         }
     }
 
@@ -141,15 +194,15 @@ public class PlayerMovement : MonoBehaviour
         {
             isWallSliding = false;
         }
-        myAnimator.SetBool("isWallSliding", isWallSliding);
     }
 
     bool IsWallSliding()
     {
-        bool touchingWall = Physics2D.Raycast(transform.position, Vector2.right * transform.localScale.x, wallCheckDistance, wallLayer);
+        Vector2 direction = Vector2.right * transform.localScale.x;
+        RaycastHit2D hit = Physics2D.Raycast(transform.position, direction, wallCheckDistance, wallLayer);
+        bool touchingWall = hit.collider != null;
         bool notGrounded = !myFeetCollider.IsTouchingLayers(LayerMask.GetMask("Ground"));
         bool movingDown = myRigidbody.velocity.y < 0;
         return touchingWall && notGrounded && movingDown;
     }
-
 }
